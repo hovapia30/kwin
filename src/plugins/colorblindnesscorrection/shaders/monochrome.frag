@@ -10,7 +10,7 @@ out vec4 fragColor;
 
 void main()
 {
-    vec4 tex = texture2D(sampler, texcoord0);
+    vec4 tex = texture(sampler, texcoord0);
     tex = sourceEncodingToNitsInDestinationColorspace(tex);
 
     tex = adjustSaturation(tex);
