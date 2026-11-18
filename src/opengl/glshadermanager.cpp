@@ -198,8 +198,7 @@ QByteArray ShaderManager::generateFragmentSource(ShaderTraits traits) const
         stream << "        result = transformY_UV(sampler, sampler1, texcoord0);\n";
         stream << "    }\n";
     } else if (traits & ShaderTrait::MapExternalTexture) {
-        // external textures require texture2D for sampling
-        stream << "    result = texture2D(sampler, texcoord0);\n";
+        stream << "    result = " << textureLookup << "(sampler, texcoord0);\n";
     } else if (traits & ShaderTrait::UniformColor) {
         stream << "    result = geometryColor;\n";
     } else if (traits & ShaderTrait::Border) {

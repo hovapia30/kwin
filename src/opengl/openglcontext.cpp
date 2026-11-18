@@ -260,7 +260,10 @@ bool OpenGlContext::checkSupported() const
     const bool supportsNonPowerOfTwoTextures = m_isOpenglES || hasOpenglExtension("GL_ARB_texture_non_power_of_two");
     const bool supports3DTextures = !m_isOpenglES || hasVersion(Version(3, 0)) || hasOpenglExtension("GL_OES_texture_3D");
     const bool supportsFBOs = m_isOpenglES || hasVersion(Version(3, 0)) || hasOpenglExtension("GL_ARB_framebuffer_object") || hasOpenglExtension(QByteArrayLiteral("GL_EXT_framebuffer_object"));
-    const bool supportsUnpack = !m_isOpenglES || hasOpenglExtension(QByteArrayLiteral("GL_EXT_unpack_subimage"));
+    // GL_UNPACK_ROW_LENGTH and friends are core since OpenGL ES 3.0. The Adreno
+    // driver does not advertise GL_EXT_unpack_subimage, but it exposes an ES 3.2
+    // context, so accept the core functionality as well.
+    const bool supportsUnpack = !m_isOpenglES || hasVersion(Version(3, 0)) || hasOpenglExtension(QByteArrayLiteral("GL_EXT_unpack_subimage"));
 
     if (!supportsGLSL || !supportsNonPowerOfTwoTextures || !supports3DTextures || !supportsFBOs || !supportsUnpack) {
         return false;

@@ -97,15 +97,60 @@ bool GLShader::link()
 
 const QByteArray GLShader::prepareSource(GLenum shaderType, const QByteArray &source) const
 {
-    // Prepare the source code
-    QByteArray ba;
     const auto context = OpenGlContext::currentContext();
-    if (context->isOpenGLES() && context->glslVersion() < Version(3, 0)) {
-        ba.append("precision highp float;\n");
-    }
-    ba.append(source);
+    QByteArray ba = source;
+
     if (context->isOpenGLES() && context->glslVersion() >= Version(3, 0)) {
-        ba.replace("#version 140", "#version 300 es\n\nprecision highp float;\n");
+        // GLSL ES 3.00: convert legacy shaders (#version 140 or unversioned)
+        // to #version 300 es syntax.
+        if (ba.contains("#version 300 es")) {
+            return ba;
+        }
+        ba.replace("#version 140", "");
+
+        QByteArray header;
+        header.append("#version 300 es\n");
+        header.append("precision highp float;\n");
+        header.append("precision highp int;\n");
+        header.append("precision highp sampler2D;\n");
+        header.append("precision highp sampler3D;\n");
+
+        // Map legacy keywords/calls to ES 3.00 equivalents.
+        ba.replace("#extension GL_OES_standard_derivatives : enable", "");
+        ba.replace("texture2D(", "texture(");
+        ba.replace("texture3D(", "texture(");
+        ba.replace("textureCube(", "texture(");
+
+        if (shaderType == GL_FRAGMENT_SHADER) {
+            if (ba.contains("gl_FragColor")) {
+                ba.replace("gl_FragColor", "fragColor");
+                header.append("out vec4 fragColor;\n");
+            }
+            // Legacy "varying" in fragment shaders becomes "in".
+            ba.replace("\nvarying ", "\nin ");
+            if (ba.startsWith("varying ")) {
+                ba.replace(0, 8, "in ");
+            }
+        } else if (shaderType == GL_VERTEX_SHADER) {
+            ba.replace("\nvarying ", "\nout ");
+            if (ba.startsWith("varying ")) {
+                ba.replace(0, 8, "out ");
+            }
+            ba.replace("\nattribute ", "\nin ");
+            if (ba.startsWith("attribute ")) {
+                ba.replace(0, 10, "in ");
+            }
+        }
+
+        return header + "\n" + ba;
+    }
+
+    if (context->isOpenGLES() && context->glslVersion() < Version(3, 0)) {
+        // GLSL ES 1.00
+        QByteArray header;
+        header.append("precision highp float;\n");
+        header.append("#extension GL_OES_standard_derivatives : enable\n");
+        return header + ba;
     }
 
     return ba;
