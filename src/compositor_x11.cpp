@@ -613,15 +613,21 @@ bool X11Compositor::compositingPossible() const
 void X11Compositor::createOpenGLSafePoint(OpenGLSafePoint safePoint)
 {
     auto group = KConfigGroup(kwinApp()->config(), QStringLiteral("Compositing"));
+    const bool freezeDetectionDisabled = qEnvironmentVariableIsSet("KWIN_NO_GL_FREEZE_DETECTION");
     switch (safePoint) {
     case OpenGLSafePoint::PreInit:
         // Explicitly write the failure timestamp so that if we crash during
         // OpenGL init, we know we should not try again.
-        group.writeEntry(QLatin1String("LastFailureTimestamp"), QDateTime::currentSecsSinceEpoch());
-        group.sync();
+        if (!freezeDetectionDisabled) {
+            group.writeEntry(QLatin1String("LastFailureTimestamp"), QDateTime::currentSecsSinceEpoch());
+            group.sync();
+        }
         // Deliberately continue with PreFrame
         Q_FALLTHROUGH();
     case OpenGLSafePoint::PreFrame:
+        if (freezeDetectionDisabled) {
+            break;
+        }
         if (m_openGLFreezeProtectionThread == nullptr) {
             Q_ASSERT(m_openGLFreezeProtection == nullptr);
             m_openGLFreezeProtectionThread = std::make_unique<QThread>();
@@ -654,11 +660,15 @@ void X11Compositor::createOpenGLSafePoint(OpenGLSafePoint safePoint)
         // Deliberately continue with PostFrame
         Q_FALLTHROUGH();
     case OpenGLSafePoint::PostFrame:
-        QMetaObject::invokeMethod(m_openGLFreezeProtection.get(), &QTimer::stop, Qt::QueuedConnection);
+        if (m_openGLFreezeProtection) {
+            QMetaObject::invokeMethod(m_openGLFreezeProtection.get(), &QTimer::stop, Qt::QueuedConnection);
+        }
         break;
     case OpenGLSafePoint::PostLastGuardedFrame:
-        m_openGLFreezeProtectionThread->quit();
-        m_openGLFreezeProtectionThread->wait();
+        if (m_openGLFreezeProtectionThread) {
+            m_openGLFreezeProtectionThread->quit();
+            m_openGLFreezeProtectionThread->wait();
+        }
         m_openGLFreezeProtectionThread.reset();
         m_openGLFreezeProtection.reset();
         break;

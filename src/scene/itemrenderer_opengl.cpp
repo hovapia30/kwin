@@ -11,6 +11,7 @@
 #include "core/renderviewport.h"
 #include "core/syncobjtimeline.h"
 #include "effect/effect.h"
+#include "opengl/egldisplay.h"
 #include "opengl/eglnativefence.h"
 #include "platformsupport/scenes/opengl/openglsurfacetexture.h"
 #include "scene/decorationitem.h"
@@ -52,7 +53,7 @@ void ItemRendererOpenGL::endFrame()
     GLVertexBuffer::streamingBuffer()->endOfFrame();
     GLFramebuffer::popFramebuffer();
 
-    if (m_eglDisplay) {
+    if (m_eglDisplay && m_eglDisplay->supportsNativeFence()) {
         EGLNativeFence fence(m_eglDisplay);
         if (fence.isValid()) {
             for (const auto &releasePoint : m_releasePoints) {

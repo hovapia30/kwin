@@ -99,13 +99,20 @@ public:
     explicit EglPixmapTexture(EglBackend *backend);
     ~EglPixmapTexture() override;
 
-    bool create(SurfacePixmapX11 *texture);
+    bool create(SurfacePixmapX11 *pixmap);
+    bool isFallback() const;
+    void updateFromPixmap(SurfacePixmapX11 *pixmap, const QRegion &region);
 
 private:
     void onDamage() override;
+    bool loadFallback(SurfacePixmapX11 *pixmap);
+    bool fetchAndUpload(SurfacePixmapX11 *pixmap, int x, int y, int width, int height);
 
     EglBackend *const m_backend;
     EGLImageKHR m_image = EGL_NO_IMAGE_KHR;
+    bool m_isFallback = false;
+    uint8_t m_depth = 0;
+    QSize m_pixmapSize;
 };
 
 class EglSurfaceTextureX11 : public OpenGLSurfaceTextureX11

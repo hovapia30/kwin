@@ -13,6 +13,7 @@
 #include "opengl/glutils.h"
 #include "utils/common.h"
 
+#include <QFileInfo>
 #include <QOpenGLContext>
 #include <drm_fourcc.h>
 #include <utils/drm_format_helper.h>
@@ -66,8 +67,7 @@ std::unique_ptr<EglDisplay> EglDisplay::create(::EGLDisplay display, bool owning
     };
     for (const QByteArray &extensionName : requiredExtensions) {
         if (!extensions.contains(extensionName)) {
-            qCWarning(KWIN_OPENGL) << extensionName << "extension is unsupported";
-            return nullptr;
+            qCWarning(KWIN_OPENGL) << extensionName << "extension is unsupported; continuing anyway";
         }
     }
 
@@ -76,6 +76,9 @@ std::unique_ptr<EglDisplay> EglDisplay::create(::EGLDisplay display, bool owning
 
 static std::optional<dev_t> devIdForFileName(const QString &path)
 {
+    if (path.isEmpty()) {
+        return std::nullopt;
+    }
     auto device = DrmDevice::open(path);
     if (device) {
         return device->deviceId();
@@ -334,16 +337,30 @@ QString EglDisplay::determineRenderNode() const
             const char *deviceExtensions = eglQueryDeviceStringEXT(eglDevice, EGL_EXTENSIONS);
             if (checkExtension(deviceExtensions, "EGL_EXT_device_drm_render_node")) {
                 if (const char *node = eglQueryDeviceStringEXT(eglDevice, EGL_DRM_RENDER_NODE_FILE_EXT)) {
-                    return QString::fromLocal8Bit(node);
+                    const QString path = QString::fromLocal8Bit(node);
+                    if (!path.isEmpty()) {
+                        return path;
+                    }
                 }
             }
             if (checkExtension(deviceExtensions, "EGL_EXT_device_drm")) {
                 // Fallback to display device.
                 if (const char *node = eglQueryDeviceStringEXT(eglDevice, EGL_DRM_DEVICE_FILE_EXT)) {
-                    return QString::fromLocal8Bit(node);
+                    const QString path = QString::fromLocal8Bit(node);
+                    if (!path.isEmpty()) {
+                        return path;
+                    }
                 }
             }
         }
+    }
+
+    // Some drivers (e.g. Adreno proprietary EGL) may report an empty DRM device
+    // path via EGL_EXT_device_drm*. Fall back to the default render node so that
+    // buffer import/sync helpers on X11 can still find a usable device.
+    const QString fallback = QStringLiteral("/dev/dri/renderD128");
+    if (QFileInfo::exists(fallback)) {
+        return fallback;
     }
     return QString();
 }
